@@ -176,45 +176,25 @@ def build_excel_bytes(blocks: List[Dict], weeks: int) -> bytes:
 # ====== Bot handlers ======
 
 SAMPLE = (
-"Понеділок  08.09
-
-"
-"Казидуб 8:00-18:00 (12:30-13:00)
-"
-"Кіселиця 10:00-20:00 (13:00-13:30)
-
-"
-"Вівторок 09.09
-
-"
-"Беньковська 8:00-18:00 (12:30-13:00)
-"
-"Пую 10:00-21:00 (13:00-13:30)
-"
+"Понеділок  08.09"
+"Казидуб 8:00-18:00 (12:30-13:00)"
+"Кіселиця 10:00-20:00 (13:00-13:30)"
+"Вівторок 09.09"
+"Беньковська 8:00-18:00 (12:30-13:00)"
+"Пую 10:00-21:00 (13:00-13:30)"
 )
 
 HELP = (
-"Надішліть текст розкладу (або .txt файл) у форматі:
-"
-"<b>Понеділок  08.09</b>
-"
-"Прізвище 8:00-18:00 (12:30-13:00)
-"
-"Прізвище 10:00-20:00 (13:00-13:30)
-
-"
-"Команди:
-"
-"/year 2025 — встановити рік для дат
-"
-"/weeks 4 — кількість тижневих блоків у листі 'week'
-"
-"/anchor 2025-09-08 — заякорити підрахунок тижнів від цього понеділка
-"
-"/format — приклад формату
-"
-"/reset — скинути налаштування чату
-"
+"Надішліть текст розкладу (або .txt файл) у форматі:"
+"<b>Понеділок  08.09</b>"
+"Прізвище 8:00-18:00 (12:30-13:00)"
+"Прізвище 10:00-20:00 (13:00-13:30)"
+"Команди:"
+"/year 2025 — встановити рік для дат"
+"/weeks 4 — кількість тижневих блоків у листі 'week'"
+"/anchor 2025-09-08 — заякорити підрахунок тижнів від цього понеділка"
+"/format — приклад формату"
+"/reset — скинути налаштування чату"
 )
 
 @dataclass
@@ -234,23 +214,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     s = get_settings(context, update.effective_chat.id)
     await update.message.reply_text(
         "Вітаю! Надішліть розклад текстом або .txt файлом — поверну Excel з аркушами "
-        "<b>week</b>, <b>detail</b>, <b>summary</b> і колонкою <b>«Перерва»</b>.
-
-"
-        + HELP + f"
-Поточні налаштування: year={s.year}, weeks={s.weeks}, anchor={s.anchor}",
+        "<b>week</b>, <b>detail</b>, <b>summary</b> і колонкою <b>«Перерва»</b>."
+        + HELP + f"Поточні налаштування: year={s.year}, weeks={s.weeks}, anchor={s.anchor}",
         parse_mode=ParseMode.HTML
     )
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     s = get_settings(context, update.effective_chat.id)
-    await update.message.reply_text(HELP + f"
-Поточні налаштування: year={s.year}, weeks={s.weeks}, anchor={s.anchor}", parse_mode=ParseMode.HTML)
+    await update.message.reply_text(HELP + f"Поточні налаштування: year={s.year}, weeks={s.weeks}, anchor={s.anchor}", parse_mode=ParseMode.HTML)
 
 async def format_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"Приклад:
-
-<pre>{SAMPLE}</pre>", parse_mode=ParseMode.HTML)
+    await update.message.reply_text(f"Приклад:<pre>{SAMPLE}</pre>", parse_mode=ParseMode.HTML)
 
 async def year_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     s = get_settings(context, update.effective_chat.id)
@@ -309,11 +283,8 @@ async def _handle_text_to_excel(update: Update, context: ContextTypes.DEFAULT_TY
                                             caption="Ось ваш файл 📄")
     except Exception as e:
         await update.message.reply_text(
-            "⚠️ Не вдалось згенерувати файл.
-"
-            f"Помилка: {e}
-
-Спробуйте /format або перевірте форматування.",
+            "⚠️ Не вдалось згенерувати файл."
+            f"Помилка: {e}Спробуйте /format або перевірте форматування.",
             parse_mode=ParseMode.HTML
         )
 
@@ -354,3 +325,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
