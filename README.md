@@ -4,7 +4,7 @@ Parses Ukrainian work-schedule text into an Excel workbook with sheets **week**,
 
 ## One-click Deploy (Heroku)
 
-[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/lajetta/schedule-bot-heroku)
+[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/lajetta/npschedule-bot-heroku)
 
 > Replace `YOUR_GITHUB_USERNAME/schedule-bot-heroku` with your public repo URL after you push this code to GitHub.
 
