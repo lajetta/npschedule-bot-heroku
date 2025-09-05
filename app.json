@@ -1,0 +1,27 @@
+{
+  "name": "Schedule Excel Telegram Bot",
+  "description": "Parses Ukrainian work schedules into Excel (week/detail/summary) and returns a file.",
+  "keywords": [
+    "telegram",
+    "bot",
+    "excel",
+    "pandas",
+    "scheduling"
+  ],
+  "env": {
+    "BOT_TOKEN": {
+      "description": "Telegram Bot API token from @BotFather",
+      "required": true
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "formation": {
+    "worker": {
+      "quantity": 1
+    }
+  }
+}
