@@ -19,11 +19,10 @@ DAY_NAMES = ["Понеділок","Вівторок","Середа","Cереда
 DAY_PATTERN = r"^(?P<dow>" + "|".join(map(re.escape, DAY_NAMES)) + r")\s+(?P<date>\d{2}\.\d{2})\s*$"
 day_re = re.compile(DAY_PATTERN)
 
-SHIFT_PATTERN = r"""
-^(?P<name>[\wА-Яа-яІіЇїЄє'’- ]+?)\s+
-(?P<start>\d{1,2}:\d{2})-(?P<end>\d{1,2}:\d{2})
-(?:\s*\((?P<bstart>\d{1,2}:\d{2})-(?P<bend>\d{1,2}:\d{2})\))?$
-"""
+SHIFT_PATTERN = r"""^(?P<name>[\wА-Яа-яІіЇїЄє'’ -]+?)\s+
+                     (?P<start>\d{1,2}:\d{2})-(?P<end>\d{1,2}:\d{2})
+                     (?:\s*\((?P<bstart>\d{1,2}:\d{2})-(?P<bend>\d{1,2}:\d{2})\))?$
+                  """
 shift_re = re.compile(SHIFT_PATTERN, re.X)
 
 def compute_duration_hours(start, end, bstart=None, bend=None) -> float:
