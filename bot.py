@@ -156,7 +156,9 @@ def build_excel_bytes(blocks: List[Dict], weeks: int) -> bytes:
     summary = build_summary(detail, weeks)
 
     bio = io.BytesIO()
-    with pd.ExcelWriter(bio, engine="xlsxwriter", options={"strings_to_numbers": False}) as writer:
+    #with pd.ExcelWriter(bio, engine="xlsxwriter", options={"strings_to_numbers": False}) as writer:
+    with pd.ExcelWriter(bio, engine="xlsxwriter", engine_kwargs={"options": {"strings_to_numbers": False}}) as writer:
+
         if not wide.empty:
             wide.to_excel(writer, sheet_name="week", index=False)
         if not detail.empty:
