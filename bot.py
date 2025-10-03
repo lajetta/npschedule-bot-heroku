@@ -165,33 +165,52 @@ def build_working_days_summary(blocks: List[Dict]) -> pd.DataFrame:
         .reset_index()
     )
     return summary
+DAY_ABBR = {
+    "Понеділок": "Пн",
+    "Вівторок": "Вт",
+    "Середа": "Ср",
+    "Четвер": "Чт",
+    "П'ятниця": "Пт",
+    "Субота": "Сб",
+    "Неділя": "Нд"
+}
+
 def build_schedule_table(blocks: List[Dict]) -> pd.DataFrame:
     rows = []
     for b in blocks:
         for e in b["entries"]:
+            dt = datetime.fromisoformat(b["date_iso"])
+            day_label = dt.strftime("%d/%m") + f" ({DAY_ABBR[b['dow']]})"
             rows.append({
                 "Працівник": e["name"],
-                "Тиждень": b["week"],
-                "День": b["dow"],
-                "Дата": datetime.fromisoformat(b["date_iso"]),
+                "Дата": day_label,
                 "Години": f"{e['start']}-{e['end']}"
             })
+
     df = pd.DataFrame(rows)
     if df.empty:
-        return pd.DataFrame(columns=["Працівник"] + DAY_NAMES)
-    
-    # Pivot the data to create a tabular view
+        return pd.DataFrame(columns=["Працівник"])
+
     schedule_table = (
         df.pivot_table(
             index="Працівник",
-            columns="День",
+            columns="Дата",
             values="Години",
-            aggfunc=lambda x: " | ".join(x)  # Combine multiple shifts for the same day
+            aggfunc=lambda x: " | ".join(x)
         )
-        .reindex(columns=DAY_NAMES, fill_value="")  # Ensure correct day order
         .reset_index()
     )
-    return schedule_table
+
+    def parse_date(label: str) -> datetime:
+        return datetime.strptime(label.split()[0], "%d/%m")
+
+    sorted_cols = ["Працівник"] + sorted(
+        [c for c in schedule_table.columns if c != "Працівник"],
+        key=parse_date
+    )
+
+    return schedule_table[sorted_cols]
+
 
 def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table):
     with pd.ExcelWriter(out_path,engine="xlsxwriter") as writer:
@@ -203,7 +222,12 @@ def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table
         for sheet in writer.sheets.values():
             sheet.set_column(0,0,26); sheet.set_column(1,100,18)
 
-
+# --- Loggi  # apply formatting for schedule table
+            ws = writer.sheets["schedule table"]
+            ws.freeze_panes(1, 1)  # freeze first row + first column
+            ws.set_column(0, 0, 26)  # employee names wider
+            ws.set_column(1, schedule_table.shape[1], 10)  # date columns narrower
+            ws.autofilter(0, 0, schedule_table.shape[0], schedule_table.shape[1]-1)
 
 
 # --- Telegram bot state ---
@@ -297,7 +321,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_cmd(update, context)
    
     elif query.data == "start":
-        await start(query.message, context)
+        await start(update, context)
 
 # --- Core ---
 async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
