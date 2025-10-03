@@ -249,7 +249,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, reset_only=F
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     if reset_only:
-        msg = "⚙️ Налаштування скинуто.✅\n👉 1.Введіть нові параметри\n👉 2.Надішліть розклад як .txt файл або скористайтеся меню нижче."
+        msg = "⚙️ Налаштування скинуто ✅\n👉 1. Введіть нові параметри.\n👉 2. Надішліть розклад як .txt файл або скористайтеся меню нижче 👇"
     else:
         msg = (
             "👋 Привіт! Я бот для обробки розкладів.\n"
