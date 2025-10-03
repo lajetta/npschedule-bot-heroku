@@ -213,13 +213,13 @@ user_settings = {}
 async def start(update_or_message, context: ContextTypes.DEFAULT_TYPE):
     # Determine the chat ID based on the type of update_or_message
     chat_id = None
-    if hasattr(update_or_message, 'effective_chat'):
+    if hasattr(update_or_message, 'effective_chat') and update_or_message.effective_chat:
         chat_id = update_or_message.effective_chat.id
-    elif hasattr(update_or_message, 'chat'):
+    elif hasattr(update_or_message, 'chat') and update_or_message.chat:
         chat_id = update_or_message.chat.id
 
     if chat_id is None:
-        print("Error: Unable to determine chat ID.")
+        print(f"Error: Unable to determine chat ID. Received object: {type(update_or_message)}")
         return
 
     # Initialize user settings
@@ -233,18 +233,18 @@ async def start(update_or_message, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     # Send the welcome message with the inline keyboard
-    if hasattr(update_or_message, 'reply_text'):
+    if hasattr(update_or_message, 'reply_text') and callable(update_or_message.reply_text):
         await update_or_message.reply_text(
             "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся кнопками нижче.",
             reply_markup=reply_markup
         )
-    elif hasattr(update_or_message, 'edit_message_text'):
+    elif hasattr(update_or_message, 'edit_message_text') and callable(update_or_message.edit_message_text):
         await update_or_message.edit_message_text(
             "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся кнопками нижче.",
             reply_markup=reply_markup
         )
     else:
-        print("Error: Unsupported update_or_message type.")
+        print(f"Error: Unsupported update_or_message type. Received object: {type(update_or_message)}")
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
