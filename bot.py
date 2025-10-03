@@ -236,29 +236,33 @@ user_settings = {}
 # --- Handlers ---
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+from telegram import ReplyKeyboardMarkup, KeyboardButton
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, reset_only=False):
     chat_id = update.effective_chat.id
-    # Reset settings (same as /reset)
+    # Reset settings
     user_settings[chat_id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
 
-    # Reply keyboard menu
     keyboard = [
         [KeyboardButton("ℹ️ Help"), KeyboardButton("🔄 Start")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    msg = (
-        "👋 Привіт! Я бот для обробки розкладів.\n"
-        "Налаштування скинуто ⚙️\n\n"
-        "Використайте меню нижче або команди /help і /start."
-    )
+    if reset_only:
+        msg = "⚙️ Налаштування скинуто.\nНадішліть розклад як .txt файл або скористайтеся меню нижче."
+    else:
+        msg = (
+            "👋 Привіт! Я бот для обробки розкладів.\n"
+            "Налаштування скинуто ⚙️\n\n"
+            "Використайте меню нижче або команди /help і /start."
+        )
 
-
-    if update.message:  # typed /start or tapped menu button
+    if update.message:
         await update.message.reply_text(msg, reply_markup=reply_markup)
-    elif update.callback_query:  # if you still use inline
+    elif update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(msg, reply_markup=reply_markup)
+
 
 
 async def reply_keyboard_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -322,7 +326,7 @@ async def anchor_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Вкажіть дату у форматі YYYY-MM-DD")
 
 async def reset_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await start(update, context)
+    await start(update, context, reset_only=True)
 
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
