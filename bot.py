@@ -329,7 +329,7 @@ def main():
         sys.exit(1)
     else:
         print(f"BOT_TOKEN is set: {token[:4]}... (truncated for security)")
-        
+
 
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
@@ -343,5 +343,6 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))  # Added callback query handler
     app.run_polling()
 
-# ...existing code...
+if __name__=="__main__":
+    main()
 
