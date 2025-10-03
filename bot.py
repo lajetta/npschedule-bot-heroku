@@ -304,10 +304,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
     elif query.data == "start":
-        if update.message:
-            await start(update, context)
+        if query.message:
+            await start(query.message, context)
         else:
-            print("Error: update.message is None")
+            print("Error: query.message is None")
 
 # --- Core ---
 async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
