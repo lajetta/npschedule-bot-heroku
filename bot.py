@@ -2,7 +2,7 @@ import os, re, sys
 import pandas as pd
 from datetime import datetime, timedelta, date
 from typing import List, Dict
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
 DAY_NAMES = ["Понеділок","Вівторок","Середа","Cереда","Четвер","П'ятниця","Субота","Неділя"]
@@ -234,26 +234,36 @@ def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table
 user_settings = {}
 
 # --- Handlers ---
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_settings[chat_id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
 
     keyboard = [
-        [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
-        [InlineKeyboardButton("🔄 Start", callback_data="start")]
+        [KeyboardButton("ℹ️ Help"), KeyboardButton("🔄 Start")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     msg = (
-        "👋 Привіт! Я бот для обробки розкладів. "
-        "Надішліть розклад як .txt файл або скористайтеся кнопками нижче."
+        "👋 Привіт! Я бот для обробки розкладів.\n"
+        "Використайте меню або команди /help і /start."
     )
 
-    if update.message:  # case: /start command
+    if update.message:
         await update.message.reply_text(msg, reply_markup=reply_markup)
-    elif update.callback_query:  # case: button clicked
+    elif update.callback_query:  # in case you still use inline buttons
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(msg, reply_markup=reply_markup)
+
+async def reply_keyboard_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "ℹ️ Help":
+        await help_cmd(update, context)   # reuse same function
+    elif text == "🔄 Start":
+        await start(update, context)      # reuse same function
+
 
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -375,6 +385,8 @@ def main():
     app.add_handler(MessageHandler(filters.Document.MimeType("text/plain"), txt_document_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.add_handler(CallbackQueryHandler(button_handler))  # Added callback query handler
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_keyboard_handler))
+
     app.run_polling()
 
 if __name__=="__main__":
