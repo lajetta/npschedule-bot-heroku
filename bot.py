@@ -214,7 +214,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_settings[update.effective_chat.id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
     keyboard = [
         [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
-        [InlineKeyboardButton("⚙️ Settings", callback_data="settings")]
+        [InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
+        [InlineKeyboardButton("🔄 Start", callback_data="start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -303,6 +304,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /reset – скинути налаштування до стандартних",
             parse_mode="HTML"
         )
+    elif query.data == "start":
+        await start(update, context)
 
 # --- Core ---
 async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
