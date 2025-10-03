@@ -213,8 +213,7 @@ user_settings = {}
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_settings[update.effective_chat.id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
     keyboard = [
-        [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
-        [InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
+        [InlineKeyboardButton("ℹ️ Help", callback_data="help"), InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
         [InlineKeyboardButton("🔄 Start", callback_data="start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
