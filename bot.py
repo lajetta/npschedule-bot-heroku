@@ -210,14 +210,15 @@ def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table
 user_settings = {}
 
 # --- Handlers ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_settings[update.effective_chat.id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
+async def start(update_or_message, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update_or_message.effective_chat.id if hasattr(update_or_message, 'effective_chat') else update_or_message.chat.id
+    user_settings[chat_id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
     keyboard = [
-        [InlineKeyboardButton("ℹ️ Help", callback_data="help"), InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
+        [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
         [InlineKeyboardButton("🔄 Start", callback_data="start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
+    await update_or_message.reply_text(
         "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся кнопками нижче.",
         reply_markup=reply_markup
     )
@@ -294,20 +295,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     if query.data == "help":
         await help_cmd(update, context)
-    elif query.data == "settings":
-        await query.edit_message_text(
-            "⚙️ <b>Налаштування:</b>\n"
-            "• /year YYYY – встановити рік\n"
-            "• /weeks N – кількість тижнів у виводі\n"
-            "• /anchor YYYY-MM-DD – задати понеділок як перший тиждень\n"
-            "• /reset – скинути налаштування до стандартних",
-            parse_mode="HTML"
-        )
+   
     elif query.data == "start":
-        if query.message:
-            await start(query.message, context)
-        else:
-            print("Error: query.message is None")
+        await start(query.message, context)
 
 # --- Core ---
 async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
