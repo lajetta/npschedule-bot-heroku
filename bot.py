@@ -210,41 +210,32 @@ def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table
 user_settings = {}
 
 # --- Handlers ---
-async def start(update_or_message, context: ContextTypes.DEFAULT_TYPE):
-    # Determine the chat ID based on the type of update_or_message
-    chat_id = None
-    if hasattr(update_or_message, 'effective_chat') and update_or_message.effective_chat:
-        chat_id = update_or_message.effective_chat.id
-    elif hasattr(update_or_message, 'chat') and update_or_message.chat:
-        chat_id = update_or_message.chat.id
-
-    if chat_id is None:
-        print(f"Error: Unable to determine chat ID. Received object: {type(update_or_message)}")
-        return
-
-    # Initialize user settings
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     user_settings[chat_id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
 
-    # Create the inline keyboard
     keyboard = [
         [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
         [InlineKeyboardButton("🔄 Start", callback_data="start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Send the welcome message with the inline keyboard
-    if hasattr(update_or_message, 'reply_text') and callable(update_or_message.reply_text):
-        await update_or_message.reply_text(
-            "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся кнопками нижче.",
-            reply_markup=reply_markup
-        )
-    elif hasattr(update_or_message, 'edit_message_text') and callable(update_or_message.edit_message_text):
-        await update_or_message.edit_message_text(
-            "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся кнопками нижче.",
-            reply_markup=reply_markup
-        )
+    msg = (
+        "👋 Привіт! Я бот для обробки розкладів. "
+        "Надішліть розклад як .txt файл або скористайтеся кнопками нижче."
+    )
+
+    if update.message:
+        # normal /start command
+        await update.message.reply_text(msg, reply_markup=reply_markup)
+    elif update.callback_query:
+        # user pressed the inline button
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(msg, reply_markup=reply_markup)
     else:
-        print(f"Error: Unsupported update_or_message type. Received object: {type(update_or_message)}")
+        print("⚠️ Unsupported update type for /start")
+
+
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
@@ -320,7 +311,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_cmd(update, context)
    
     elif query.data == "start":
-        await start(update, context)
+        await start(query.message, context)
 
 # --- Core ---
 async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
