@@ -2,8 +2,8 @@ import os, re, sys
 import pandas as pd
 from datetime import datetime, timedelta, date
 from typing import List, Dict
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
 DAY_NAMES = ["Понеділок","Вівторок","Середа","Cереда","Четвер","П'ятниця","Субота","Неділя"]
 DAY_PATTERN = r"^(?P<dow>" + "|".join(map(re.escape, DAY_NAMES)) + r")\s+(?P<date>\d{1,2}\.\d{1,2})\s*$"
@@ -165,13 +165,41 @@ def build_working_days_summary(blocks: List[Dict]) -> pd.DataFrame:
         .reset_index()
     )
     return summary
+def build_schedule_table(blocks: List[Dict]) -> pd.DataFrame:
+    rows = []
+    for b in blocks:
+        for e in b["entries"]:
+            rows.append({
+                "Працівник": e["name"],
+                "Тиждень": b["week"],
+                "День": b["dow"],
+                "Дата": datetime.fromisoformat(b["date_iso"]),
+                "Години": f"{e['start']}-{e['end']}"
+            })
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return pd.DataFrame(columns=["Працівник"] + DAY_NAMES)
+    
+    # Pivot the data to create a tabular view
+    schedule_table = (
+        df.pivot_table(
+            index="Працівник",
+            columns="День",
+            values="Години",
+            aggfunc=lambda x: " | ".join(x)  # Combine multiple shifts for the same day
+        )
+        .reindex(columns=DAY_NAMES, fill_value="")  # Ensure correct day order
+        .reset_index()
+    )
+    return schedule_table
 
-def write_excel(out_path,wide,detail,summary,working_days_summary):
+def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table):
     with pd.ExcelWriter(out_path,engine="xlsxwriter") as writer:
         if not wide.empty: wide.to_excel(writer,sheet_name="week",index=False)
         if not detail.empty: detail.to_excel(writer,sheet_name="detail",index=False)
         if not summary.empty: summary.to_excel(writer,sheet_name="summary",index=False)
         if not working_days_summary.empty:working_days_summary.to_excel(writer, sheet_name="working days summary", index=False)
+        if not schedule_table.empty:schedule_table.to_excel(writer, sheet_name="schedule table", index=False)
         for sheet in writer.sheets.values():
             sheet.set_column(0,0,26); sheet.set_column(1,100,18)
 
@@ -184,47 +212,61 @@ user_settings = {}
 # --- Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_settings[update.effective_chat.id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
-    await update.message.reply_text("👋 Привіт! Надішліть розклад як текст або .txt файл. Використайте /help для довідки.")
+    keyboard = [
+        [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="settings")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся кнопками нижче.",
+        reply_markup=reply_markup
+    )
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
-        "/year YYYY – встановити рік\n"
-        "/weeks N – кількість тижнів у виводі\n"
-        "/anchor YYYY-MM-DD – задати понеділок як перший тиждень\n"
-        "/reset – скинути налаштування до стандартних"
+        "ℹ️ <b>Довідка</b>\n\n"
+        "📅 <b>Команди:</b>\n"
+        "• /year YYYY – встановити рік\n"
+        "• /weeks N – кількість тижнів у виводі\n"
+        "• /anchor YYYY-MM-DD – задати понеділок як перший тиждень\n"
+        "• /reset – скинути налаштування до стандартних\n\n"
+        "📂 Надішліть розклад як .txt файл, і я створю таблицю 📊"
     )
-    await update.message.reply_text(msg)
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 async def year_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         year = int(context.args[0])
         user_settings[update.effective_chat.id]["year"] = year
-        await update.message.reply_text(f"Рік змінено на {year}")
+        await update.message.reply_text(f"✅ Рік змінено на {year} 📅")
     except:
-        await update.message.reply_text("Вкажіть рік, наприклад: /year 2025")
+        await update.message.reply_text("❌ Вкажіть рік, наприклад: /year 2025")
 
 async def weeks_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         w = int(context.args[0])
         user_settings[update.effective_chat.id]["weeks"] = w
-        await update.message.reply_text(f"Кількість тижнів змінено на {w}")
+        await update.message.reply_text(f"✅ Кількість тижнів змінено на {w} 📆")
     except:
-        await update.message.reply_text("Вкажіть число, наприклад: /weeks 6")
+        await update.message.reply_text("❌ Вкажіть число, наприклад: /weeks 6")
 
 async def anchor_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         d = datetime.strptime(context.args[0], "%Y-%m-%d").date()
         user_settings[update.effective_chat.id]["anchor"] = d
-        await update.message.reply_text(f"Початковий понеділок встановлено: {d}")
+        await update.message.reply_text(f"✅ Початковий понеділок встановлено: {d} 📌")
     except:
-        await update.message.reply_text("Вкажіть дату у форматі YYYY-MM-DD")
+        await update.message.reply_text("❌ Вкажіть дату у форматі YYYY-MM-DD")
 
 async def reset_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_settings[update.effective_chat.id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
-    await update.message.reply_text("Налаштування скинуто.")
+    await update.message.reply_text(
+        "⚙️ Налаштування скинуто.\n"
+        "Надішліть розклад як .txt файл або скористайтеся /help для довідки."
+    )
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
@@ -234,11 +276,27 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def txt_document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     if doc.mime_type != "text/plain":
-        await update.message.reply_text("Будь ласка, надішліть .txt файл")
+        await update.message.reply_text("❌ Будь ласка, надішліть .txt файл 📂")
         return
     file = await doc.get_file()
     text = (await file.download_as_bytearray()).decode("utf-8")
     await process_schedule_and_reply(update, context, text)
+
+# --- Callback Query Handler ---
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "help":
+        await help_cmd(update, context)
+    elif query.data == "settings":
+        await query.edit_message_text(
+            "⚙️ <b>Налаштування:</b>\n"
+            "• /year YYYY – встановити рік\n"
+            "• /weeks N – кількість тижнів у виводі\n"
+            "• /anchor YYYY-MM-DD – задати понеділок як перший тиждень\n"
+            "• /reset – скинути налаштування до стандартних",
+            parse_mode="HTML"
+        )
 
 # --- Core ---
 async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
@@ -256,16 +314,18 @@ async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAU
     detail=build_detail(blocks)
     summary=build_summary(detail,weeks)
     working_days_summary = build_working_days_summary(blocks)
+    schedule_table = build_schedule_table(blocks)
     out_path="schedule.xlsx"
-    write_excel(out_path,wide,detail,summary,working_days_summary)
+    write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table)
     await update.message.reply_document(open(out_path,"rb"), filename="schedule.xlsx")
 
 # --- Main ---
 def main():
-    token=os.environ.get("BOT_TOKEN")
+    token = os.environ.get("BOT_TOKEN")
     if not token:
-        print("BOT_TOKEN not set"); sys.exit(1)
-    app=Application.builder().token(token).build()
+        print("BOT_TOKEN not set")
+        sys.exit(1)
+    app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("year", year_cmd))
@@ -274,8 +334,8 @@ def main():
     app.add_handler(CommandHandler("reset", reset_cmd))
     app.add_handler(MessageHandler(filters.Document.MimeType("text/plain"), txt_document_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+    app.add_handler(CallbackQueryHandler(button_handler))  # Added callback query handler
     app.run_polling()
-    
-if __name__=="__main__":
-    main()
+
+# ...existing code...
 
