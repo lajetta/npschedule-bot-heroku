@@ -232,11 +232,13 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /reset – скинути налаштування до стандартних\n\n"
         "📂 Надішліть розклад як .txt файл, і я створю таблицю 📊"
     )
-    # Add a check for NoneType before accessing update.message
     if update.message:
         await update.message.reply_text(msg, parse_mode="HTML")
+    elif update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(msg, parse_mode="HTML")
     else:
-        print("Error: update.message is None")
+        print("Error: Unsupported update type or empty update.")
 
 async def year_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
