@@ -147,6 +147,67 @@ def write_excel(out_path,wide,detail,summary):
         if not summary.empty: summary.to_excel(writer,sheet_name="summary",index=False)
         for sheet in writer.sheets.values():
             sheet.set_column(0,0,26); sheet.set_column(1,100,18)
+# Add this function to calculate working days summary
+def build_working_days_summary(blocks: List[Dict]) -> pd.DataFrame:
+    rows = []
+    for b in blocks:
+        for e in b["entries"]:
+            rows.append({
+                "Працівник": e["name"],
+                "Тиждень": b["week"],
+                "День": b["dow"],
+                "Дата": datetime.fromisoformat(b["date_iso"]),
+                "Години": e["tab_hours"]
+            })
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return pd.DataFrame(columns=["Працівник", "Тиждень", "День", "Дата", "Години"])
+    
+    # Group by employee and week, and aggregate the data
+    summary = (
+        df.groupby(["Працівник", "Тиждень"])
+        .agg(
+            Дні=("День", lambda x: ", ".join(sorted(set(x)))),
+            Години=("Години", "sum")
+        )
+        .reset_index()
+    )
+    return summary
+
+# Update the write_excel function to include the new tab
+def write_excel(out_path, wide, detail, summary, working_days_summary):
+    with pd.ExcelWriter(out_path, engine="xlsxwriter") as writer:
+        if not wide.empty:
+            wide.to_excel(writer, sheet_name="week", index=False)
+        if not detail.empty:
+            detail.to_excel(writer, sheet_name="detail", index=False)
+        if not summary.empty:
+            summary.to_excel(writer, sheet_name="summary", index=False)
+        if not working_days_summary.empty:
+            working_days_summary.to_excel(writer, sheet_name="working_days", index=False)
+        for sheet in writer.sheets.values():
+            sheet.set_column(0, 0, 26)
+            sheet.set_column(1, 100, 18)
+
+# Update the process_schedule_and_reply function to include the new feature
+async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    settings = user_settings.get(update.effective_chat.id, {"year": datetime.now().year, "weeks": 4, "anchor": None})
+    year = settings["year"]
+    blocks = parse_blocks_for_text(text, year)
+    if not blocks:
+        await update.message.reply_text("Не вдалося розпізнати розклад")
+        return
+    min_date = min(datetime.fromisoformat(b["date_iso"]).date() for b in blocks)
+    first_monday = anchor_monday(min_date, settings["anchor"].isoformat() if settings["anchor"] else None)
+    assign_weeks(blocks, first_monday)
+    weeks = settings["weeks"]
+    wide = build_wide_weeks(blocks, weeks)
+    detail = build_detail(blocks)
+    summary = build_summary(detail, weeks)
+    working_days_summary = build_working_days_summary(blocks)
+    out_path = "schedule.xlsx"
+    write_excel(out_path, wide, detail, summary, working_days_summary)
+    await update.message.reply_document(open(out_path, "rb"), filename="schedule.xlsx")
 
 # --- Telegram bot state ---
 user_settings = {}
