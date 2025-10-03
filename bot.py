@@ -234,12 +234,14 @@ def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table
 user_settings = {}
 
 # --- Handlers ---
-
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
+    # Reset settings (same as /reset)
     user_settings[chat_id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
 
+    # Reply keyboard menu
     keyboard = [
         [KeyboardButton("ℹ️ Help"), KeyboardButton("🔄 Start")]
     ]
@@ -247,22 +249,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = (
         "👋 Привіт! Я бот для обробки розкладів.\n"
-        "Використайте меню або команди /help і /start."
+        "Налаштування скинуто ⚙️\n\n"
+        "Використайте меню нижче або команди /help і /start."
     )
 
-    if update.message:
+
+    if update.message:  # typed /start or tapped menu button
         await update.message.reply_text(msg, reply_markup=reply_markup)
-    elif update.callback_query:  # in case you still use inline buttons
+    elif update.callback_query:  # if you still use inline
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(msg, reply_markup=reply_markup)
 
+
 async def reply_keyboard_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+    text = update.message.text.strip()
 
     if text == "ℹ️ Help":
-        await help_cmd(update, context)   # reuse same function
+        await help_cmd(update, context)
     elif text == "🔄 Start":
-        await start(update, context)      # reuse same function
+        await start(update, context)   # acts as reset + welcome
+    else:
+        # if it's not a menu option, try parsing schedule
+        await process_schedule_and_reply(update, context, text)
+
+
 
 
 
@@ -312,11 +322,8 @@ async def anchor_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Вкажіть дату у форматі YYYY-MM-DD")
 
 async def reset_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_settings[update.effective_chat.id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
-    await update.message.reply_text(
-        "⚙️ Налаштування скинуто.\n"
-        "Надішліть розклад як .txt файл або скористайтеся /help для довідки."
-    )
+    await start(update, context)
+
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
@@ -383,9 +390,9 @@ def main():
     app.add_handler(CommandHandler("anchor", anchor_cmd))
     app.add_handler(CommandHandler("reset", reset_cmd))
     app.add_handler(MessageHandler(filters.Document.MimeType("text/plain"), txt_document_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
-    app.add_handler(CallbackQueryHandler(button_handler))  # Added callback query handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_keyboard_handler))
+    app.add_handler(CallbackQueryHandler(button_handler))  # Added callback query handler
+    
 
     app.run_polling()
 
