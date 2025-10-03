@@ -159,7 +159,7 @@ def build_working_days_summary(blocks: List[Dict]) -> pd.DataFrame:
     summary = (
         df.groupby(["Працівник", "Тиждень"])
         .agg(
-            Дні=("День", lambda x: ", ".join(sorted(set(x)))),
+            Дні=("День", lambda x: ", ".join(sorted(set(x), key=DAY_NAMES.index))),
             Години=("Години", "sum")
         )
         .reset_index()
@@ -171,7 +171,7 @@ def write_excel(out_path,wide,detail,summary,working_days_summary):
         if not wide.empty: wide.to_excel(writer,sheet_name="week",index=False)
         if not detail.empty: detail.to_excel(writer,sheet_name="detail",index=False)
         if not summary.empty: summary.to_excel(writer,sheet_name="summary",index=False)
-        if not working_days_summary.empty:working_days_summary.to_excel(writer, sheet_name="working_days", index=False)
+        if not working_days_summary.empty:working_days_summary.to_excel(writer, sheet_name="working days summary", index=False)
         for sheet in writer.sheets.values():
             sheet.set_column(0,0,26); sheet.set_column(1,100,18)
 
