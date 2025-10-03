@@ -2,7 +2,7 @@ import os, re, sys
 import pandas as pd
 from datetime import datetime, timedelta, date
 from typing import List, Dict
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup,ReplyKeyboardMarkup,KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
 DAY_NAMES = ["Понеділок","Вівторок","Середа","Cереда","Четвер","П'ятниця","Субота","Неділя"]
@@ -165,13 +165,22 @@ def build_working_days_summary(blocks: List[Dict]) -> pd.DataFrame:
         .reset_index()
     )
     return summary
+DAY_ABBR = {
+    "Понеділок": "Пн",
+    "Вівторок": "Вт",
+    "Середа": "Ср",
+    "Четвер": "Чт",
+    "П'ятниця": "Пт",
+    "Субота": "Сб",
+    "Неділя": "Нд"
+}
 def build_schedule_table(blocks: List[Dict]) -> pd.DataFrame:
     rows = []
     for b in blocks:
         for e in b["entries"]:
             dt = datetime.fromisoformat(b["date_iso"])
             # Format: 01/10 (Пн), 02/10 (Вт), etc.
-            day_label = dt.strftime("%d/%m") + f" ({b['dow'][:2]})"
+            day_label = dt.strftime("%d/%m") + f" ({DAY_ABBR[b['dow']]})"
             rows.append({
                 "Працівник": e["name"],
                 "Дата": day_label,
@@ -205,24 +214,26 @@ def build_schedule_table(blocks: List[Dict]) -> pd.DataFrame:
     return schedule_table[sorted_cols]
 
 
-def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table):
-    with pd.ExcelWriter(out_path,engine="xlsxwriter") as writer:
-        if not wide.empty: wide.to_excel(writer,sheet_name="week",index=False)
-        if not detail.empty: detail.to_excel(writer,sheet_name="detail",index=False)
-        if not summary.empty: summary.to_excel(writer,sheet_name="summary",index=False)
-        if not working_days_summary.empty:working_days_summary.to_excel(writer, sheet_name="working days summary", index=False)
-        if not schedule_table.empty:schedule_table.to_excel(writer, sheet_name="schedule table", index=False)
-        for sheet in writer.sheets.values():
-            sheet.set_column(0,0,26); sheet.set_column(1,100,18)
+def write_excel(out_path, wide, detail, summary, working_days_summary, schedule_table):
+    with pd.ExcelWriter(out_path, engine="xlsxwriter") as writer:
+        if not wide.empty:
+            wide.to_excel(writer, sheet_name="week", index=False)
+        if not detail.empty:
+            detail.to_excel(writer, sheet_name="detail", index=False)
+        if not summary.empty:
+            summary.to_excel(writer, sheet_name="summary", index=False)
+        if not working_days_summary.empty:
+            working_days_summary.to_excel(writer, sheet_name="working days summary", index=False)
+        if not schedule_table.empty:
+            schedule_table.to_excel(writer, sheet_name="schedule table", index=False)
 
-              # apply formatting for schedule table
+        # Apply formatting for the schedule table
+        if not schedule_table.empty:
             ws = writer.sheets["schedule table"]
-            ws.freeze_panes(1, 1)  # freeze first row + first column
-            ws.set_column(0, 0, 26)  # employee names wider
-            ws.set_column(1, schedule_table.shape[1], 10)  # date columns narrower
-            ws.autofilter(0, 0, schedule_table.shape[0], schedule_table.shape[1]-1)
-
-
+            ws.freeze_panes(1, 1)  # Freeze first row and column
+            ws.set_column(0, 0, 26)  # Employee names wider
+            ws.set_column(1, schedule_table.shape[1], 10)  # Date columns narrower
+            ws.autofilter(0, 0, schedule_table.shape[0], schedule_table.shape[1] - 1)
 
 # --- Telegram bot state ---
 user_settings = {}
@@ -232,28 +243,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_settings[chat_id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
 
+    # Use ReplyKeyboardMarkup consistently
     keyboard = [
-        [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
-        [InlineKeyboardButton("🔄 Start", callback_data="start")]
+        [KeyboardButton("ℹ️ Help"), KeyboardButton("🔄 Start")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    msg = (
-        "👋 Привіт! Я бот для обробки розкладів. "
-        "Надішліть розклад як .txt файл або скористайтеся кнопками нижче."
+    # Send the welcome message with the reply keyboard
+    await update.message.reply_text(
+        "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся меню нижче.",
+        reply_markup=reply_markup
     )
 
-    if update.message:
-        # normal /start command
-        await update.message.reply_text(msg, reply_markup=reply_markup)
-    elif update.callback_query:
-        # user pressed the inline button
-        await update.callback_query.answer()
-        await update.callback_query.edit_message_text(msg, reply_markup=reply_markup)
-    else:
-        print("⚠️ Unsupported update type for /start")
-
-
+async def reply_keyboard_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    if text == "ℹ️ Help":
+        await help_cmd(update, context)
+    elif text == "🔄 Start":
+        await start(update, context)
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
@@ -265,92 +272,148 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /reset – скинути налаштування до стандартних\n\n"
         "📂 Надішліть розклад як .txt файл, і я створю таблицю 📊"
     )
-    if update.message:
-        await update.message.reply_text(msg, parse_mode="HTML")
-    elif update.callback_query:
-        await update.callback_query.answer()
-        await update.callback_query.edit_message_text(msg, parse_mode="HTML")
-    else:
-        print("Error: Unsupported update type or empty update.")
+    await update.message.reply_text(msg, parse_mode="HTML")
 
-async def year_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Simplify the write_excel function
 
+def write_excel(out_path, wide, detail, summary, working_days_summary, schedule_table):
+    with pd.ExcelWriter(out_path, engine="xlsxwriter") as writer:
+        if not wide.empty:
+            wide.to_excel(writer, sheet_name="week", index=False)
+        if not detail.empty:
+            detail.to_excel(writer, sheet_name="detail", index=False)
+        if not summary.empty:
+            summary.to_excel(writer, sheet_name="summary", index=False)
+        if not working_days_summary.empty:
+            working_days_summary.to_excel(writer, sheet_name="working days summary", index=False)
+        if not schedule_table.empty:
+            schedule_table.to_excel(writer, sheet_name="schedule table", index=False)
+
+        # Apply formatting for the schedule table
+        if not schedule_table.empty:
+            ws = writer.sheets["schedule table"]
+            ws.freeze_panes(1, 1)  # Freeze first row and column
+            ws.set_column(0, 0, 26)  # Employee names wider
+            ws.set_column(1, schedule_table.shape[1], 10)  # Date columns narrower
+            ws.autofilter(0, 0, schedule_table.shape[0], schedule_table.shape[1] - 1)
+
+# Add logging for critical operations
+async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     try:
-        year = int(context.args[0])
-        user_settings[update.effective_chat.id]["year"] = year
-        await update.message.reply_text(f"✅ Рік змінено на {year} 📅")
-    except:
-        await update.message.reply_text("❌ Вкажіть рік, наприклад: /year 2025")
+        settings = user_settings.get(update.effective_chat.id, {"year": datetime.now().year, "weeks": 4, "anchor": None})
+        year = settings["year"]
+        blocks = parse_blocks_for_text(text, year)
+        if not blocks:
+            await update.message.reply_text("Не вдалося розпізнати розклад")
+            return
 
-async def weeks_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        min_date = min(datetime.fromisoformat(b["date_iso"]).date() for b in blocks)
+        first_monday = anchor_monday(min_date, settings["anchor"].isoformat() if settings["anchor"] else None)
+        assign_weeks(blocks, first_monday)
+        weeks = settings["weeks"]
+        wide = build_wide_weeks(blocks, weeks)
+        detail = build_detail(blocks)
+        summary = build_summary(detail, weeks)
+        working_days_summary = build_working_days_summary(blocks)
+        schedule_table = build_schedule_table(blocks)
+        out_path = "schedule.xlsx"
+        write_excel(out_path, wide, detail, summary, working_days_summary, schedule_table)
 
-    try:
-        w = int(context.args[0])
-        user_settings[update.effective_chat.id]["weeks"] = w
-        await update.message.reply_text(f"✅ Кількість тижнів змінено на {w} 📆")
-    except:
-        await update.message.reply_text("❌ Вкажіть число, наприклад: /weeks 6")
+        await update.message.reply_document(open(out_path, "rb"), filename="schedule.xlsx")
+        print("✅ Schedule processed and Excel file generated successfully.")
+    except Exception as e:
+        print(f"❌ Error processing schedule: {e}")
+        await update.message.reply_text("❌ Сталася помилка під час обробки розкладу.")
 
-async def anchor_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- Telegram bot state ---
+user_settings = {}
 
-    try:
-        d = datetime.strptime(context.args[0], "%Y-%m-%d").date()
-        user_settings[update.effective_chat.id]["anchor"] = d
-        await update.message.reply_text(f"✅ Початковий понеділок встановлено: {d} 📌")
-    except:
-        await update.message.reply_text("❌ Вкажіть дату у форматі YYYY-MM-DD")
+# --- Handlers ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_settings[chat_id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
 
-async def reset_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_settings[update.effective_chat.id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
+    # Use ReplyKeyboardMarkup consistently
+    keyboard = [
+        [KeyboardButton("ℹ️ Help"), KeyboardButton("🔄 Start")]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+    # Send the welcome message with the reply keyboard
     await update.message.reply_text(
-        "⚙️ Налаштування скинуто.\n"
-        "Надішліть розклад як .txt файл або скористайтеся /help для довідки."
+        "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся меню нижче.",
+        reply_markup=reply_markup
     )
 
-async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def reply_keyboard_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    if text:
-        await process_schedule_and_reply(update, context, text)
-
-async def txt_document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    doc = update.message.document
-    if doc.mime_type != "text/plain":
-        await update.message.reply_text("❌ Будь ласка, надішліть .txt файл 📂")
-        return
-    file = await doc.get_file()
-    text = (await file.download_as_bytearray()).decode("utf-8")
-    await process_schedule_and_reply(update, context, text)
-
-# --- Callback Query Handler ---
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    if query.data == "help":
+    if text == "ℹ️ Help":
         await help_cmd(update, context)
-   
-    elif query.data == "start":
+    elif text == "🔄 Start":
         await start(update, context)
 
-# --- Core ---
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "ℹ️ <b>Довідка</b>\n\n"
+        "📅 <b>Команди:</b>\n"
+        "• /year YYYY – встановити рік\n"
+        "• /weeks N – кількість тижнів у виводі\n"
+        "• /anchor YYYY-MM-DD – задати понеділок як перший тиждень\n"
+        "• /reset – скинути налаштування до стандартних\n\n"
+        "📂 Надішліть розклад як .txt файл, і я створю таблицю 📊"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+# Simplify the write_excel function
+
+def write_excel(out_path, wide, detail, summary, working_days_summary, schedule_table):
+    with pd.ExcelWriter(out_path, engine="xlsxwriter") as writer:
+        if not wide.empty:
+            wide.to_excel(writer, sheet_name="week", index=False)
+        if not detail.empty:
+            detail.to_excel(writer, sheet_name="detail", index=False)
+        if not summary.empty:
+            summary.to_excel(writer, sheet_name="summary", index=False)
+        if not working_days_summary.empty:
+            working_days_summary.to_excel(writer, sheet_name="working days summary", index=False)
+        if not schedule_table.empty:
+            schedule_table.to_excel(writer, sheet_name="schedule table", index=False)
+
+        # Apply formatting for the schedule table
+        if not schedule_table.empty:
+            ws = writer.sheets["schedule table"]
+            ws.freeze_panes(1, 1)  # Freeze first row and column
+            ws.set_column(0, 0, 26)  # Employee names wider
+            ws.set_column(1, schedule_table.shape[1], 10)  # Date columns narrower
+            ws.autofilter(0, 0, schedule_table.shape[0], schedule_table.shape[1] - 1)
+
+# Add logging for critical operations
 async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    settings = user_settings.get(update.effective_chat.id, {"year": datetime.now().year, "weeks": 4, "anchor": None})
-    year = settings["year"]
-    blocks=parse_blocks_for_text(text,year)
-    if not blocks:
-        await update.message.reply_text("Не вдалося розпізнати розклад")
-        return
-    min_date=min(datetime.fromisoformat(b["date_iso"]).date() for b in blocks)
-    first_monday=anchor_monday(min_date, settings["anchor"].isoformat() if settings["anchor"] else None)
-    assign_weeks(blocks,first_monday)
-    weeks=settings["weeks"]
-    wide=build_wide_weeks(blocks,weeks)
-    detail=build_detail(blocks)
-    summary=build_summary(detail,weeks)
-    working_days_summary = build_working_days_summary(blocks)
-    schedule_table = build_schedule_table(blocks)
-    out_path="schedule.xlsx"
-    write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table)
-    await update.message.reply_document(open(out_path,"rb"), filename="schedule.xlsx")
+    try:
+        settings = user_settings.get(update.effective_chat.id, {"year": datetime.now().year, "weeks": 4, "anchor": None})
+        year = settings["year"]
+        blocks = parse_blocks_for_text(text, year)
+        if not blocks:
+            await update.message.reply_text("Не вдалося розпізнати розклад")
+            return
+
+        min_date = min(datetime.fromisoformat(b["date_iso"]).date() for b in blocks)
+        first_monday = anchor_monday(min_date, settings["anchor"].isoformat() if settings["anchor"] else None)
+        assign_weeks(blocks, first_monday)
+        weeks = settings["weeks"]
+        wide = build_wide_weeks(blocks, weeks)
+        detail = build_detail(blocks)
+        summary = build_summary(detail, weeks)
+        working_days_summary = build_working_days_summary(blocks)
+        schedule_table = build_schedule_table(blocks)
+        out_path = "schedule.xlsx"
+        write_excel(out_path, wide, detail, summary, working_days_summary, schedule_table)
+
+        await update.message.reply_document(open(out_path, "rb"), filename="schedule.xlsx")
+        print("✅ Schedule processed and Excel file generated successfully.")
+    except Exception as e:
+        print(f"❌ Error processing schedule: {e}")
+        await update.message.reply_text("❌ Сталася помилка під час обробки розкладу.")
 
 # --- Main ---
 def main():
@@ -374,6 +437,7 @@ def main():
     app.add_handler(MessageHandler(filters.Document.MimeType("text/plain"), txt_document_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.add_handler(CallbackQueryHandler(button_handler))  # Added callback query handler
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_keyboard_handler))
     app.run_polling()
 
 if __name__=="__main__":
