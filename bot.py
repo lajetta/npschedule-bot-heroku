@@ -320,7 +320,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_cmd(update, context)
    
     elif query.data == "start":
-        await start(query.message, context)
+        await start(update, context)
 
 # --- Core ---
 async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
