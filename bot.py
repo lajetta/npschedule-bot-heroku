@@ -321,10 +321,16 @@ async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAU
 
 # --- Main ---
 def main():
+    # Add logging to debug BOT_TOKEN
+    print("Starting bot...")
     token = os.environ.get("BOT_TOKEN")
     if not token:
-        print("BOT_TOKEN not set")
+        print("Error: BOT_TOKEN environment variable is not set.")
         sys.exit(1)
+    else:
+        print(f"BOT_TOKEN is set: {token[:4]}... (truncated for security)")
+        
+
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
