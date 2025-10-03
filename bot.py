@@ -232,7 +232,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /reset – скинути налаштування до стандартних\n\n"
         "📂 Надішліть розклад як .txt файл, і я створю таблицю 📊"
     )
-    await update.message.reply_text(msg, parse_mode="HTML")
+    # Add a check for NoneType before accessing update.message
+    if update.message:
+        await update.message.reply_text(msg, parse_mode="HTML")
+    else:
+        print("Error: update.message is None")
 
 async def year_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
