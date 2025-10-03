@@ -139,15 +139,7 @@ def build_summary(detail:pd.DataFrame,weeks:int)->pd.DataFrame:
     pv.columns=[f"Тиждень {c}" for c in pv.columns]
     pv["Всього (год)"]=pv.sum(axis=1).round(2)
     return pv.reset_index()
-
-def write_excel(out_path,wide,detail,summary):
-    with pd.ExcelWriter(out_path,engine="xlsxwriter") as writer:
-        if not wide.empty: wide.to_excel(writer,sheet_name="week",index=False)
-        if not detail.empty: detail.to_excel(writer,sheet_name="detail",index=False)
-        if not summary.empty: summary.to_excel(writer,sheet_name="summary",index=False)
-        for sheet in writer.sheets.values():
-            sheet.set_column(0,0,26); sheet.set_column(1,100,18)
-# Add this function to calculate working days summary
+# function to calculate working days summary
 def build_working_days_summary(blocks: List[Dict]) -> pd.DataFrame:
     rows = []
     for b in blocks:
@@ -174,40 +166,17 @@ def build_working_days_summary(blocks: List[Dict]) -> pd.DataFrame:
     )
     return summary
 
-# Update the write_excel function to include the new tab
-def write_excel(out_path, wide, detail, summary, working_days_summary):
-    with pd.ExcelWriter(out_path, engine="xlsxwriter") as writer:
-        if not wide.empty:
-            wide.to_excel(writer, sheet_name="week", index=False)
-        if not detail.empty:
-            detail.to_excel(writer, sheet_name="detail", index=False)
-        if not summary.empty:
-            summary.to_excel(writer, sheet_name="summary", index=False)
-        if not working_days_summary.empty:
-            working_days_summary.to_excel(writer, sheet_name="working_days", index=False)
+def write_excel(out_path,wide,detail,summary,working_days_summary):
+    with pd.ExcelWriter(out_path,engine="xlsxwriter") as writer:
+        if not wide.empty: wide.to_excel(writer,sheet_name="week",index=False)
+        if not detail.empty: detail.to_excel(writer,sheet_name="detail",index=False)
+        if not summary.empty: summary.to_excel(writer,sheet_name="summary",index=False)
+        if not working_days_summary.empty:working_days_summary.to_excel(writer, sheet_name="working_days", index=False)
         for sheet in writer.sheets.values():
-            sheet.set_column(0, 0, 26)
-            sheet.set_column(1, 100, 18)
+            sheet.set_column(0,0,26); sheet.set_column(1,100,18)
 
-# Update the process_schedule_and_reply function to include the new feature
-async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    settings = user_settings.get(update.effective_chat.id, {"year": datetime.now().year, "weeks": 4, "anchor": None})
-    year = settings["year"]
-    blocks = parse_blocks_for_text(text, year)
-    if not blocks:
-        await update.message.reply_text("Не вдалося розпізнати розклад")
-        return
-    min_date = min(datetime.fromisoformat(b["date_iso"]).date() for b in blocks)
-    first_monday = anchor_monday(min_date, settings["anchor"].isoformat() if settings["anchor"] else None)
-    assign_weeks(blocks, first_monday)
-    weeks = settings["weeks"]
-    wide = build_wide_weeks(blocks, weeks)
-    detail = build_detail(blocks)
-    summary = build_summary(detail, weeks)
-    working_days_summary = build_working_days_summary(blocks)
-    out_path = "schedule.xlsx"
-    write_excel(out_path, wide, detail, summary, working_days_summary)
-    await update.message.reply_document(open(out_path, "rb"), filename="schedule.xlsx")
+
+
 
 # --- Telegram bot state ---
 user_settings = {}
@@ -286,8 +255,9 @@ async def process_schedule_and_reply(update: Update, context: ContextTypes.DEFAU
     wide=build_wide_weeks(blocks,weeks)
     detail=build_detail(blocks)
     summary=build_summary(detail,weeks)
+    working_days_summary = build_working_days_summary(blocks)
     out_path="schedule.xlsx"
-    write_excel(out_path,wide,detail,summary)
+    write_excel(out_path,wide,detail,summary,working_days_summary)
     await update.message.reply_document(open(out_path,"rb"), filename="schedule.xlsx")
 
 # --- Main ---
@@ -305,7 +275,7 @@ def main():
     app.add_handler(MessageHandler(filters.Document.MimeType("text/plain"), txt_document_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.run_polling()
-
+    
 if __name__=="__main__":
     main()
 
