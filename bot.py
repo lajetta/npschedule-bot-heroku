@@ -234,18 +234,27 @@ def write_excel(out_path,wide,detail,summary,working_days_summary,schedule_table
 user_settings = {}
 
 # --- Handlers ---
-async def start(update_or_message, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update_or_message.effective_chat.id if hasattr(update_or_message, 'effective_chat') else update_or_message.chat.id
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     user_settings[chat_id] = {"year": datetime.now().year, "weeks": 4, "anchor": None}
+
     keyboard = [
-        [InlineKeyboardButton("ℹ️ Help", callback_data="help"), InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
+        [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
         [InlineKeyboardButton("🔄 Start", callback_data="start")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update_or_message.reply_text(
-        "👋 Привіт! Я бот для обробки розкладів. Надішліть розклад як .txt файл або скористайтеся кнопками нижче.",
-        reply_markup=reply_markup
+
+    msg = (
+        "👋 Привіт! Я бот для обробки розкладів. "
+        "Надішліть розклад як .txt файл або скористайтеся кнопками нижче."
     )
+
+    if update.message:  # case: /start command
+        await update.message.reply_text(msg, reply_markup=reply_markup)
+    elif update.callback_query:  # case: button clicked
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(msg, reply_markup=reply_markup)
+
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
